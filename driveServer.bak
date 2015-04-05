@@ -1,0 +1,42 @@
+#!/usr/bin/python
+import socket
+import serial
+
+ser=serial.Serial('/dev/ttyAMA0',38400)
+import socket
+
+HOST = ''                # Symbolic name meaning all available interfaces
+PORT = 9099              # Arbitrary non-privileged port
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+def go(x,y):
+ ser.write(chr(128))
+ ser.write(chr(6))
+ ser.write(chr(x))
+ ser.write(chr((128+6+x)&0x7F))
+ ser.write(chr(128))
+ ser.write(chr(7))
+ ser.write(chr(y))
+ ser.write(chr((128+7+y)&0x7F))
+
+sock.bind((HOST, PORT))
+while 1:
+ try:
+  sock.listen(1)
+  conn, addr = sock.accept()
+  while 1:
+   data = conn.recv(10)
+   drive=data.split(',')
+   if drive[0]<0:
+    drive[0]=0
+   if drive[1]<0:
+    drive[1]=0;
+   print(drive[0]+','+drive[1])
+   go(int(drive[0]),int(drive[1]))
+ except KeyboardInterrupt:
+  go(64,64)
+  break 
+ except:
+  go(64,64)
+  pass
+conn.close()
