@@ -23,20 +23,15 @@ def main():
 				break
 			except:
 				pass
-		print 'Setting mode'
 		wiimote.rpt_mode = cwiid.RPT_BALANCE | cwiid.RPT_BTN
-		print 'Set led'
 		wiimote.led=1
-		print 'Requesting status'
 		wiimote.request_status()
-		print 'Begin calibration'
 		balance_calibration = wiimote.get_balance_cal()
 		named_calibration = { 'right_top': balance_calibration[0],
 								'right_bottom': balance_calibration[1],
 								'left_top': balance_calibration[2],
 								'left_bottom': balance_calibration[3],
 							}
-		print 'Finished, enterning main program'
 		return wiimote
 
 	def sensor_read():
@@ -63,7 +58,6 @@ def main():
 		if total_load<threshold:
 			output=[25,25,25,25]
 		return output
-		#print total_load
 
 	def translate_lr(input):
 		right=(input[0]-input[2])/50.0
@@ -84,14 +78,11 @@ def main():
 	ride=0
 	notify=0
 	while 1:
-		print 'Initiating remote'
 		init_remote()
 		while 1:
 			try:
 				wiimote.request_status()
-				print 'Status requested'
 				if wiimote.state['buttons']:
-					print 'buttons'
 					ride=1
 					notify=0
 					state=0
@@ -100,26 +91,20 @@ def main():
 						state=not state
 						sleep(.5)
 				if ride:
-					print 'ride'
 					coords=[scale_for_motor(v) for v in translate_lr(sensor_read())]
 					coords=accel(coords,prev_coords);
-					print coords
 					prev_coords=coords
 					mesg=chr(coords[0])+chr(coords[1])
-					print 'Before socket'
 					print sock
 					result=sock.sendto(mesg, '/tmp/driveSocket')
-					print 'After socket'
 					sleep(0.025)
 				if sensor_read()==[25,25,25,25]:
-					print 'Missing rider'
 					ride=0
 					if not notify:
 						mesg=chr(64)+chr(64)
 						#sock.sendto(mesg, '/tmp/driveSocket')
 						print 'Rider lost'
 						notify=1
-					print 'end missing rider'
 			except(RuntimeError):
 				print RuntimeError
 				mesg=chr(64)+chr(64)
