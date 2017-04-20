@@ -1,0 +1,130 @@
+#!/usr/bin/python
+import socket
+import serial
+import time
+import os
+
+def writeBat():
+ ser.write('M1:getb\r\n')
+ time.sleep(0.1)
+ volts=ser.read(ser.inWaiting())
+ volts=volts.replace('M1:B','')
+ volts=int(volts)/10.0
+ batlog=open('/tmp/batlog','w')
+ batlog.write(str(volts))
+ batlog.close()
+
+def writeMode(drive,kill):
+ file=open('/home/pi/drive/mode','w')
+ file.write(str(drive)+','+str(kill))
+ file.close()
+
+speedLimit=1047
+def limit(xVal):
+ if -200 < xVal < 200:
+  return 0
+ else:
+  return max(-speedLimit,min(speedLimit,xVal))
+
+def go(x,y):
+ x=limit(x)
+ y=limit(y)
+ ser.write('M1: '+str(x)+'\r\n')
+ ser.write('M2: '+str(y)+'\r\n')
+
+#connect serial
+ser=serial.Serial('/dev/ttyAMA0',9600)
+
+#binding for single joystick
+sockSingle=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sockSingle.bind(('',4444))
+sockSingle.setblocking(0)
+singleData=0
+
+#local socket for wii input
+try:
+ os.remove('/tmp/driveSocket')
+except:
+ pass
+sockLocal=socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+sockLocal.bind('/tmp/driveSocket')
+sockLocal.setblocking(0)
+dualData=0
+
+lastSet=0
+timeout=0
+lastMode=0
+try:
+ while 1:
+ #Single stick mode
+  try:
+   data,addr=sockSingle.recvfrom(1024)
+   singleData=1
+  except:
+   pass
+  if singleData==1:
+   left=127
+   right=127
+   x=ord(data[1])
+   y=ord(data[0])
+   x=int(-(x-127)*16)
+   y=int(-(y-127)*16)
+   left=x-y
+   right=x+y
+   print str(left)+','+str(right)
+   go(left,right)
+   singleData=0
+   lastSet=time.time()
+   timeout=0
+   if ord(data[0])==127 and ord(data[1])==127 and lastMode==0:
+    lastMode=1
+    up=ord(data[2])
+    down=ord(data[3])
+    print str(up)+','+str(down)
+    if up<64 and down<64:
+     writeMode(0,0)
+     speedLimit=300
+     print('Stopped, calm')
+    if up>192 and down<64:
+     writeMode(1,0)
+     speedLimit=1024
+     print('Driving, calm')
+    if up>192 and down>192:
+     writeMode(1,1)
+     speedLimit=2047
+     print('Driving, kill')
+    if up<64 and down>192:
+     writeMode(0,1)
+     speedLimit=2047
+     print('Stopped, kill')
+ #Wii board mode
+  try:
+   dataLocal,addr=sockLocal.recvfrom(1024)
+   dualData=1
+  except:
+   pass
+  if dualData==1:
+   x=ord(dataLocal[1])
+   y=ord(dataLocal[0])
+   right=int(-(x-64))*32
+   left=int(-(y-64))*32
+   #left=x-y
+   #right=x+y
+   print str(right)+','+str(left)+' Board'
+   go(left,right)
+   dualData=0
+   lastSet=time.time()
+   timeout=0
+  if time.time()-lastSet>.5 and timeout!=1:
+   print '0,0'
+   timeout=1
+   lastMode=0
+   go(0,0)
+   writeBat()
+except(KeyboardInterrupt):
+ go(0,0)
+ exit() 
+except:
+ go(0,0)
+ pass
+
