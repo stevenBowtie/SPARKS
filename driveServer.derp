@@ -1,0 +1,66 @@
+#!/usr/bin/python
+import socket
+import serial
+import time
+
+ser=serial.Serial('/dev/ttyAMA0',38400)
+import socket
+
+PORT = 4444
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+def go(x,y):
+ ser.write(chr(128))
+ ser.write(chr(6))
+ ser.write(chr(x))
+ ser.write(chr((128+6+x)&0x7F))
+ ser.write(chr(128))
+ ser.write(chr(7))
+ ser.write(chr(y))
+ ser.write(chr((128+7+y)&0x7F))
+
+def limit(toLimit):
+ if 62<toLimit<68:
+  return(64)
+ else:
+  return min(127,max(0,toLimit))
+
+sock.bind(('', PORT))
+sock.setblocking(0)
+newData=0
+lastSet=0
+timeout=0
+while 1:
+ try:
+  while 1:
+   try:
+    data, addr = sock.recvfrom(1024)
+    newData=1
+   except:
+    pass
+   if newData:
+    y=127-int(float(ord(data[1]))**2/65025*127)
+    x=int(float(ord(data[0]))**2/65025*90)
+    if x<64:
+     right=limit(y+x-64)
+     left=limit(y-x+64)
+    else:
+     left=limit(y-x+64)
+     right=limit(y+x-64)
+    print str(x)+','+str(y)
+    print(str(right)+','+str(left))
+#    go(right,left)  #Disable drive
+    lastSet=time.time()
+    timeout=0
+    newData=0
+   if time.time()-lastSet>.5 and timeout!=1:
+    print '64,64'
+    timeout=1
+    go(64,64)
+ except KeyboardInterrupt:
+  go(64,64)
+  break 
+ except:
+  go(64,64)
+  pass
+sock.close()
